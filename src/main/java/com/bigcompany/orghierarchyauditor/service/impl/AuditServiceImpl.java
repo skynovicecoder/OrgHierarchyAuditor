@@ -16,7 +16,7 @@ public class AuditServiceImpl implements AuditService {
     @Value("${orgHierarchyAuditor.reportingLineThreshold:4}")
     private int reportingLineThreshold;
 
-    public void runAudit(String csvPath) throws OrgHierarchyAuditException{
+    public void runAudit(String csvPath) throws OrgHierarchyAuditException {
         log.debug("AuditService:: runAudit: File Name with Path : {}", csvPath);
         Map<Integer, Employee> employees = CsvReaderUtil.readEmployeesFromCsv(csvPath);
         Optional<Employee> ceoOpt = employees.values().stream()
@@ -31,7 +31,7 @@ public class AuditServiceImpl implements AuditService {
 
         Employee ceo = ceoOpt.get();
         log.info("\n\u001B[32m----------------------------------------------------------------------------------------------------------------------------\u001B[0m");
-        log.info("\nBigCompany CEO Found: {} {}", ceo.getFirstName(), ceo.getLastName());
+        log.info("\nBigCompany CEO Found: {}", getFullName(ceo));
         log.info("\n\u001B[32m----------------------------------------------------------------------------------------------------------------------------\u001B[0m");
 
         checkSalaryCompliance(employees);
@@ -42,15 +42,18 @@ public class AuditServiceImpl implements AuditService {
         log.info("\nSalary Compliance Report:");
 
         StringBuilder belowThresholdTable = new StringBuilder("\n\n====== Managers BELOW 20% Salary MIN-Threshold ======\n");
-        belowThresholdTable.append(String.format("%-12s %-20s %-10s %-20s %-15s %-25s %-25s%n",
-                "EmployeeID", "Name", "Salary", "Subordinates-AVG", "MIN-Threshold", "Diff from MIN-Threshold", "% Less than MIN-Threshold"));
+        belowThresholdTable.append(String.format("%-8s %-12s %-20s %-10s %-20s %-15s %-25s %-25s%n",
+                "Count", "EmployeeID", "Name", "Salary", "Subordinates-AVG", "MIN-Threshold", "Diff from MIN-Threshold", "% Less than MIN-Threshold"));
 
         StringBuilder aboveThresholdTable = new StringBuilder("\n\n====== Managers ABOVE 50% Salary MAX-Threshold ======\n");
-        aboveThresholdTable.append(String.format("%-12s %-20s %-10s %-20s %-15s %-25s %-25s%n",
-                "EmployeeID", "Name", "Salary", "Subordinates-AVG", "MAX-Threshold", "Diff from MAX-Threshold", "% More than MAX-Threshold"));
+        aboveThresholdTable.append(String.format("%-8s %-12s %-20s %-10s %-20s %-15s %-25s %-25s%n",
+                "Count", "EmployeeID", "Name", "Salary", "Subordinates-AVG", "MAX-Threshold", "Diff from MAX-Threshold", "% More than MAX-Threshold"));
 
         boolean foundBelow = false;
         boolean foundAbove = false;
+
+        int belowCount = 0;
+        int aboveCount = 0;
 
         for (Employee manager : employees.values()) {
             if (manager.getSubordinates().isEmpty()) continue;
@@ -66,17 +69,19 @@ public class AuditServiceImpl implements AuditService {
 
             if (salary < minRequired) {
                 foundBelow = true;
+                belowCount++;
 
                 double salaryDifference = minRequired - salary;
                 double lessPercentage = (salaryDifference / salary) * 100;
                 log.debug("\n***************************************************************************************");
-                log.debug("\nManager: {} {} earns {}, which is BELOW 20% threshold (expected ≥ {}) \nHence {} is getting {} less, which is {}% less than min threshold salary.",
-                        manager.getFirstName(), manager.getLastName(), String.format("%.2f", salary), String.format("%.2f", minRequired), manager.getFirstName(), String.format("%.2f", salaryDifference), String.format("%.2f", lessPercentage));
+                log.debug("\nManager: {} earns {}, which is BELOW 20% threshold (expected ≥ {}) \nHence {} is getting {} less, which is {}% less than min threshold salary.",
+                        getFullName(manager), String.format("%.2f", salary), String.format("%.2f", minRequired), manager.getFirstName(), String.format("%.2f", salaryDifference), String.format("%.2f", lessPercentage));
                 log.debug("\n**************************************************************************************");
 
-                belowThresholdTable.append(String.format("%-12d %-20s %-10.2f %-20.2f %-15.2f %-25.2f %-25.2f%n",
+                belowThresholdTable.append(String.format("%-8d %-12d %-20s %-10.2f %-20.2f %-15.2f %-25.2f %-25.2f%n",
+                        belowCount,
                         manager.getId(),
-                        manager.getFirstName() + " " + manager.getLastName(),
+                        getFullName(manager),
                         salary,
                         avgSubSalary,
                         minRequired,
@@ -85,17 +90,19 @@ public class AuditServiceImpl implements AuditService {
 
             } else if (salary > maxAllowed) {
                 foundAbove = true;
+                aboveCount++;
 
                 double salaryDifference = salary - maxAllowed;
                 double morePercentage = (salaryDifference / maxAllowed) * 100;
                 log.debug("\n#######################################################################################");
-                log.debug("\nManager: {} {} earns {}, which is ABOVE 50% threshold (expected ≤ {}) \nHence {} is getting {} more, which is {}% more than max threshold salary.",
-                        manager.getFirstName(), manager.getLastName(), String.format("%.2f", salary), String.format("%.2f", maxAllowed), manager.getFirstName(), String.format("%.2f", salaryDifference), String.format("%.2f", morePercentage));
+                log.debug("\nManager: {} earns {}, which is ABOVE 50% threshold (expected ≤ {}) \nHence {} is getting {} more, which is {}% more than max threshold salary.",
+                        getFullName(manager), String.format("%.2f", salary), String.format("%.2f", maxAllowed), manager.getFirstName(), String.format("%.2f", salaryDifference), String.format("%.2f", morePercentage));
                 log.debug("\n######################################################################################");
 
-                aboveThresholdTable.append(String.format("%-12d %-20s %-10.2f %-20.2f %-15.2f %-25.2f %-25.2f%n",
+                aboveThresholdTable.append(String.format("%-8d %-12d %-20s %-10.2f %-20.2f %-15.2f %-25.2f %-25.2f%n",
+                        aboveCount,
                         manager.getId(),
-                        manager.getFirstName() + " " + manager.getLastName(),
+                        getFullName(manager),
                         salary,
                         avgSubSalary,
                         maxAllowed,
@@ -103,10 +110,15 @@ public class AuditServiceImpl implements AuditService {
                         morePercentage));
             }
         }
-        if (!foundBelow) {
+        if (foundBelow) {
+            belowThresholdTable.append("\nTotal Violations: ").append(belowCount).append("\n");
+        } else {
             belowThresholdTable.append("(No violations found)\n");
         }
-        if (!foundAbove) {
+
+        if (foundAbove) {
+            aboveThresholdTable.append("\nTotal Violations: ").append(aboveCount).append("\n");
+        } else {
             aboveThresholdTable.append("(No violations found)\n");
         }
 
@@ -121,8 +133,12 @@ public class AuditServiceImpl implements AuditService {
     private void checkReportingDepth(Employee ceo) {
         log.info("\nReporting Chain Depth Report:");
 
-        StringBuilder reportingDepthTable = new StringBuilder("\n\n====== Employees with Reporting Line Depth Greater Than Reporting-Line-Threshold i.e. " + reportingLineThreshold + " In-Between Managers Allowed ======\n");
-        reportingDepthTable.append(String.format("%-12s %-20s %-30s%n", "EmployeeID", "Name", "Levels Above Threshold"));
+        StringBuilder reportingDepthTable = new StringBuilder("\n\n====== Employees with Reporting Line Depth Greater Than Reporting-Line-Threshold i.e. "
+                + reportingLineThreshold + " In-Between Managers Allowed ======\n");
+
+        reportingDepthTable.append(String.format("%-8s %-12s %-20s %-30s%n", "Count", "EmployeeID", "Name", "Levels Above Threshold"));
+
+        int count = 0;
         boolean found = false;
 
         Deque<Employee> stack = new ArrayDeque<>();
@@ -138,16 +154,18 @@ public class AuditServiceImpl implements AuditService {
 
             if (depth > inBetweenThreshold) {
                 found = true;
+                count++;
 
                 int extraDepth = depth - inBetweenThreshold;
                 log.debug("\n--------------------------------------------------------------------------------------");
-                log.debug("\nEmployee {} {} is {} levels below CEO (limit = {}) \nHence {} is having reporting line {} level more from the defined threshold",
-                        current.getFirstName(), current.getLastName(), depth, reportingLineThreshold, current.getFirstName(), extraDepth);
+                log.debug("\nEmployee {} is {} levels below CEO (limit = {}) \nHence {} is having reporting line {} level more from the defined threshold",
+                        getFullName(current), depth, reportingLineThreshold, current.getFirstName(), extraDepth);
                 log.debug("\n-------------------------------------------------------------------------------------");
 
-                reportingDepthTable.append(String.format("%-12d %-20s %-30d%n",
+                reportingDepthTable.append(String.format("%-8d %-12d %-20s %-30d%n",
+                        count,
                         current.getId(),
-                        current.getFirstName() + " " + current.getLastName(),
+                        getFullName(current),
                         extraDepth));
             }
 
@@ -156,12 +174,19 @@ public class AuditServiceImpl implements AuditService {
                 depthStack.push(depth + 1);
             }
         }
+
         if (!found) {
             reportingDepthTable.append("(No employees exceeded reporting line threshold)\n");
+        } else {
+            reportingDepthTable.append("\nTotal Violations: ").append(count).append("\n");
         }
 
         log.info("\n\u001B[33m----------------------------------------------------------------------------------------------------------------------------\u001B[0m");
         log.info(reportingDepthTable.toString());
         log.info("\n\u001B[33m----------------------------------------------------------------------------------------------------------------------------\u001B[0m");
+    }
+
+    private String getFullName(Employee employee) {
+        return employee.getFirstName() + " " + employee.getLastName();
     }
 }
