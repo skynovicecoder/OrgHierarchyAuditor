@@ -8,8 +8,32 @@ A Java application to validate a company's organizational structure, including:
 
 ## 🔧 Requirements
 
-- Java 21+
+- Java 21
 - Maven 3+
+
+> ℹ️ Tested on:  
+> ✅ JDK 21 (Adoptium/OpenJDK)  
+> ✅ Maven 3.9+  
+> ❌ Not compatible with Java 24 (see known issues below)
+
+## ⚠️ Known Issue with Java 24
+
+If you try to compile using **JDK 24**, you may encounter the following error:
+```text
+[ERROR] Failed to execute goal org.apache.maven.plugins:maven-compiler-plugin:3.11.0:compile (default-compile)
+on project org-hierarchy-auditor: Fatal error compiling: java.lang.ExceptionInInitializerError:
+com.sun.tools.javac.code.TypeTag :: UNKNOWN -> [Help 1]
+```
+```text
+💥 Why This Happens
+Java 24 introduced internal changes to com.sun.tools.javac.code.TypeTag and other compiler internals.
+Libraries like Lombok, Maven Compiler Plugin, or even OpenCSV annotation processors may rely on those internal APIs.
+This leads to:
+ExceptionInInitializerError on TypeTag.UNKNOWN during annotation processing or compilation.
+✅ Solution
+Use Java 21 (LTS) instead of Java 24.
+This project is designed and tested with Java 21
+```
 
 ## 📂 CSV Input Format
 
