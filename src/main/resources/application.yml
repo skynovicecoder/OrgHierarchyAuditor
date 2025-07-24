@@ -1,0 +1,7 @@
+logging:
+  level:
+    root: INFO
+    com.bigcompany.orghierarchyauditor: INFO #Use DEBUG/TRACE mode In PROD only for debugging issues
+
+orgHierarchyAuditor:
+  reportingLineThreshold: 4
